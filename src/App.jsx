@@ -1,21 +1,55 @@
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, AuthContext } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import StockChart from './components/StockChart';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Signup from './components/Signup';
+import { useContext, useEffect, useState } from 'react';
 import './App.css';
 
 function App() {
-  // Sample stock data (replace with API data from backend)
-  const sampleStockData = [
-    { date: '2025-05-01', open: 100, high: 105, low: 98, close: 102 },
-    { date: '2025-05-02', open: 102, high: 108, low: 100, close: 106 },
-    { date: '2025-05-03', open: 106, high: 110, low: 104, close: 108 },
-    { date: '2025-05-04', open: 108, high: 112, low: 106, close: 110 },
-    { date: '2025-05-05', open: 110, high: 115, low: 108, close: 113 },
-  ];
+  const [stockData, setStockData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchStockData = async () => {
+      try {
+        const response = await fetch(
+          `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=IBM&apikey=N8WR3XS3NJG0WNB4&outputsize=compact`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch stock data');
+        }
+
+        const rawData = await response.json();
+        const timeSeries = rawData['Time Series (Daily)'];
+        if (!timeSeries) {
+          throw new Error('Invalid data format from API');
+        }
+
+        const data = Object.entries(timeSeries)
+          .map(([date, values]) => ({
+            date,
+            open: parseFloat(values['1. open']),
+            high: parseFloat(values['2. high']),
+            low: parseFloat(values['3. low']),
+            close: parseFloat(values['4. close']),
+          }))
+          .slice(0, 5); // Limit to recent 5 days for chart
+
+        setStockData(data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message || 'An error occurred while fetching stock data');
+        setLoading(false);
+      }
+    };
+
+    fetchStockData();
+  }, []);
 
   return (
     <AuthProvider>
@@ -27,8 +61,23 @@ function App() {
               <Link to="/" className="text-2xl font-bold">TradeChip</Link>
               <div className="space-x-4">
                 <Link to="/dashboard" className="hover:underline">Dashboard</Link>
-                <Link to="/login" className="hover:underline">Login</Link>
-                <Link to="/signup" className="hover:underline">Sign Up</Link>
+                <AuthContext.Consumer>
+                  {({ user, logout }) => (
+                    user ? (
+                      <button
+                        onClick={() => logout()}
+                        className="hover:underline"
+                      >
+                        Logout
+                      </button>
+                    ) : (
+                      <>
+                        <Link to="/login" className="hover:underline">Login</Link>
+                        <Link to="/signup" className="hover:underline">Sign Up</Link>
+                      </>
+                    )
+                  )}
+                </AuthContext.Consumer>
               </div>
             </div>
           </nav>
@@ -46,10 +95,20 @@ function App() {
                     Analyze trading strategies and make informed decisions with real-time stock data.
                   </p>
                   <div className="bg-white p-6 rounded-lg shadow-md">
-                    <h2 className="text-2xl font-semibold mb-4">Stock Performance</h2>
-                    <div className="h-96">
-                      <StockChart stockData={sampleStockData} />
-                    </div>
+                    <h2 className="text-2xl font-semibold mb-4">Stock Performance (IBM)</h2>
+                    {loading ? (
+                      <div className="h-96 flex items-center justify-center">
+                        <p>Loading stock data...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="h-96 flex items-center justify-center">
+                        <p className="text-red-500">{error}</p>
+                      </div>
+                    ) : (
+                      <div className="h-96">
+                        <StockChart stockData={stockData} />
+                      </div>
+                    )}
                   </div>
                 </div>
               }
