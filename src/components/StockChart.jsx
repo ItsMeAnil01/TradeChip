@@ -19,8 +19,10 @@ const StockChart = ({ stockData }) => {
           l: item.low,
           c: item.close,
         })),
-        borderColor: 'rgba(75, 192, 192, 1)',
-        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+        borderColor: '#10b981',
+        backgroundColor: stockData.map(item =>
+          item.close >= item.open ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)'
+        ),
       },
     ],
   };
@@ -29,33 +31,22 @@ const StockChart = ({ stockData }) => {
     scales: {
       x: {
         type: 'time',
-        time: {
-          unit: 'day',
-        },
-        title: {
-          display: true,
-          text: 'Date',
-        },
+        time: { unit: 'day' },
+        title: { display: true, text: 'Date' },
       },
       y: {
-        title: {
-          display: true,
-          text: 'Price (USD)',
-        },
+        title: { display: true, text: 'Price (USD)' },
       },
     },
     plugins: {
-      legend: {
-        display: true,
-      },
-      tooltip: {
-        enabled: true,
-      },
+      legend: { display: false },
+      tooltip: { enabled: true },
     },
+    maintainAspectRatio: false,
   };
 
   return (
-    <div className="w-full h-full">
+    <div data-testid="stock-chart-container" className="w-full h-full">
       <Chart type="candlestick" data={data} options={options} />
     </div>
   );

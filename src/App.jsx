@@ -1,23 +1,66 @@
 import { BrowserRouter as Router, Route, Routes, Link } from 'react-router-dom';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
-import TradingViewChart from './components/TradingViewChart';
+import StockChart from './components/StockChart';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Signup from './components/Signup';
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import './App.css';
 
 function App() {
-  const [selectedStock, setSelectedStock] = useState('NASDAQ:IBM');
+  const [stockData, setStockData] = useState([]);
+  const [selectedStock, setSelectedStock] = useState('IBM');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  // Sample stock options for dropdown
+  // Stock options for dropdown
   const stockOptions = [
-    { value: 'NASDAQ:IBM', label: 'IBM' },
-    { value: 'NASDAQ:AAPL', label: 'Apple Inc.' },
-    { value: 'NASDAQ:TSLA', label: 'Tesla Inc.' },
-    { value: 'NASDAQ:GOOGL', label: 'Alphabet Inc.' },
+    { value: 'IBM', label: 'IBM' },
+    { value: 'AAPL', label: 'Apple Inc.' },
+    { value: 'TSLA', label: 'Tesla Inc.' },
+    { value: 'GOOGL', label: 'Alphabet Inc.' },
   ];
+
+  useEffect(() => {
+    const fetchStockData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=${selectedStock}&apikey=N8WR3XS3NJG0WNB4&outputsize=compact`
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch stock data');
+        }
+
+        const rawData = await response.json();
+        const timeSeries = rawData['Time Series (Daily)'];
+        if (!timeSeries) {
+          throw new Error('Invalid data format from API');
+        }
+
+        const data = Object.entries(timeSeries)
+          .map(([date, values]) => ({
+            date,
+            open: parseFloat(values['1. open']),
+            high: parseFloat(values['2. high']),
+            low: parseFloat(values['3. low']),
+            close: parseFloat(values['4. close']),
+          }))
+          .slice(0, 10);
+
+        setStockData(data);
+        setLoading(false);
+      } catch (err) {
+        setError(err.message || 'An error occurred while fetching stock data');
+        setLoading(false);
+      }
+    };
+
+    fetchStockData();
+  }, [selectedStock]);
 
   return (
     <AuthProvider>
@@ -64,7 +107,7 @@ function App() {
                   </p>
                   <div className="bg-white p-6 rounded-lg shadow-md">
                     <div className="flex justify-between items-center mb-4">
-                      <h2 className="text-2xl font-semibold">Stock Performance</h2>
+                      <h2 className="text-2xl font-semibold">Stock Performance ({selectedStock})</h2>
                       <select
                         value={selectedStock}
                         onChange={(e) => setSelectedStock(e.target.value)}
@@ -77,9 +120,19 @@ function App() {
                         ))}
                       </select>
                     </div>
-                    <div className="h-[600px]">
-                      <TradingViewChart symbol={selectedStock} />
-                    </div>
+                    {loading ? (
+                      <div className="h-[600px] flex items-center justify-center">
+                        <p>Loading stock data...</p>
+                      </div>
+                    ) : error ? (
+                      <div className="h-[600px] flex items-center justify-center">
+                        <p className="text-red-500">{error}</p>
+                      </div>
+                    ) : (
+                      <div className="h-[600px]">
+                        <StockChart stockData={stockData} />
+                      </div>
+                    )}
                   </div>
                 </div>
               }
